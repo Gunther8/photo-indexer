@@ -14,15 +14,23 @@
 
 ## 快速开始
 
-一台 2核2G 起步的云服务器（CentOS / Alma / Rocky / Ubuntu / Debian），root 登录后：
+一台 2核2G 起步的云服务器（CentOS / Alma / Rocky / Ubuntu / Debian），root 登录后一条命令下载：
 
 ```bash
-git clone https://github.com/Gunther8/photo-indexer.git
-cd photo-indexer
-sudo bash deploy.sh
+mkdir -p ~/photo-indexer && curl -fsSL https://codeload.github.com/Gunther8/photo-indexer/tar.gz/refs/heads/main | tar xz -C ~/photo-indexer --strip-components=1
 ```
 
-脚本会全程交互式引导你：装依赖 → 填三个密钥 → 网盘扫码授权 → 装服务 → 起 Web，结束后直接给你访问地址。
+然后运行部署脚本：
+
+```bash
+cd ~/photo-indexer && sudo bash deploy.sh
+```
+
+（装了 git 的话，`git clone https://github.com/Gunther8/photo-indexer.git` 也一样。）
+
+脚本会全程交互式引导你：装依赖 → 填三个密钥 → 网盘授权 → 装服务 → 起 Web，结束后直接给你访问地址。
+
+> 项目需要 **Python ≥ 3.10**。CentOS 等系统自带的是 3.6，脚本检测到版本过低会自动装一份独立的 Python，不动系统环境。
 
 然后跑首次索引（放 `screen` 里，避免 SSH 断开中断）：
 
