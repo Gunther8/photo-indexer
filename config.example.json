@@ -1,0 +1,26 @@
+{
+  "baidu_app_key": "你的百度网盘应用 AppKey",
+  "baidu_app_secret": "你的百度网盘应用 SecretKey",
+  "baidu_access_token": "",
+  "baidu_refresh_token": "",
+
+  "qwen_api_key": "阿里云百炼 API Key (sk-xxxxxx)",
+  "qwen_model": "qwen3-vl-plus",
+  "analysis_mode": "batch",
+
+  "amap_api_key": "高德地图 Web 服务 API Key（可选，用于 GPS 反查地址）",
+
+  "scan_path": "/",
+  "exclude_paths": [],
+  "batch_size": 20,
+  "download_workers": 3,
+  "image_max_size": 1024,
+  "max_video_size_mb": 500,
+  "max_photo_size_mb": 50,
+  "http_proxy": "",
+
+  "web_user": "admin",
+  "web_pass": "改成你自己的强密码",
+  "web_domain": "",
+  "web_port": 8080
+}

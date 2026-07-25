@@ -1,0 +1,28 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.env
+.venv/
+venv/
+
+# 敏感配置与本地数据
+config.json
+*.db
+*.db-wal
+*.db-shm
+blocked_ips.json
+*.pem
+*.key
+thumbnails/
+jpeg_cache/
+*.log
+
+# 构建产物
+dist/
+build/
+*.spec
+
+.DS_Store
+.idea/
+.vscode/

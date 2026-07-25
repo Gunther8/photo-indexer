@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>详情</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; }
+
+.topbar { position: sticky; top: 0; z-index: 100; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; padding: 12px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.back { color: #4a9eff; text-decoration: none; font-size: 14px; white-space: nowrap; }
+.back:hover { text-decoration: underline; }
+.fname { font-size: 15px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.dl-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid #333; background: #1e1e1e; color: #aaa; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.dl-btn:hover { background: #2a2a2a; color: #fff; }
+
+/* JPEG 下拉按钮组 */
+.btn-group { position: relative; }
+.jpeg-arrow { padding: 6px 10px; border-radius: 6px; border: 1px solid #333; background: #1e1e1e; color: #aaa; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.jpeg-arrow:hover { background: #2a2a2a; color: #fff; }
+.jpeg-dd { display: none; position: absolute; top: calc(100% + 6px); right: 0; background: #1e1e1e; border: 1px solid #333; border-radius: 8px; overflow: hidden; min-width: 170px; z-index: 200; box-shadow: 0 4px 20px rgba(0,0,0,.6); }
+.jpeg-dd.show { display: block; }
+.jpeg-dd-item { padding: 10px 16px; font-size: 13px; color: #aaa; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.jpeg-dd-item:hover { background: #2a2a2a; color: #fff; }
+.jpeg-dd-item span { font-size: 11px; color: #555; }
+
+/* 下载进度弹窗 */
+.dl-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 999; align-items: center; justify-content: center; }
+.dl-overlay.show { display: flex; }
+.dl-box { background: #1a1a1a; border: 1px solid #333; border-radius: 14px; padding: 28px 32px; min-width: 340px; text-align: center; }
+.dl-box h3 { font-size: 15px; color: #ddd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; margin: 0 auto 16px; }
+.dl-track { background: #2a2a2a; border-radius: 99px; height: 8px; overflow: hidden; margin-bottom: 10px; }
+.dl-bar { height: 100%; background: #4a9eff; border-radius: 99px; width: 0; transition: width .15s; }
+.dl-pct { font-size: 22px; font-weight: 600; color: #4a9eff; margin-bottom: 4px; }
+.dl-size { font-size: 12px; color: #555; margin-bottom: 20px; }
+.dl-cancel { padding: 6px 22px; border-radius: 6px; border: 1px solid #444; background: transparent; color: #888; font-size: 13px; cursor: pointer; }
+.dl-cancel:hover { color: #fff; border-color: #666; }
+
+/* 右键菜单 */
+.ctx-menu { position: fixed; background: #1e1e1e; border: 1px solid #333; border-radius: 10px; overflow: hidden; min-width: 190px; z-index: 500; box-shadow: 0 6px 24px rgba(0,0,0,.6); }
+.ctx-title { padding: 8px 14px 4px; font-size: 11px; color: #555; letter-spacing: .5px; }
+.ctx-item { padding: 10px 14px; font-size: 13px; color: #ccc; cursor: pointer; display: flex; justify-content: space-between; }
+.ctx-item:hover { background: #2a2a2a; }
+.ctx-item span { font-size: 11px; color: #555; }
+.ctx-sep { height: 1px; background: #2a2a2a; margin: 4px 0; }
+
+/* Toast 提示 */
+.toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: rgba(30,30,30,.95); border: 1px solid #333; border-radius: 8px; padding: 10px 20px; font-size: 13px; color: #ddd; z-index: 2000; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+/* 预览加载遮罩 */
+.preview-loading { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 15; }
+.preview-loading p { color: #fff; font-size: 14px; margin-bottom: 6px; }
+.preview-loading small { color: #888; font-size: 12px; }
+
+.layout { display: flex; gap: 0; min-height: calc(100vh - 53px); }
+
+/* 左：图片 */
+.img-panel { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; min-height: 400px; position: sticky; top: 53px; height: calc(100vh - 53px); overflow: hidden; }
+.img-panel img { max-width: 90%; max-height: 90%; object-fit: contain; transition: transform .3s ease; }
+.img-placeholder { font-size: 80px; color: #222; }
+.rotate-bar { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 10; }
+.rot-btn { padding: 5px 16px; border-radius: 6px; border: 1px solid #444; background: rgba(30,30,30,.85); color: #ccc; font-size: 18px; cursor: pointer; user-select: none; backdrop-filter: blur(4px); }
+.rot-btn:hover { background: rgba(60,60,60,.9); color: #fff; }
+
+/* 右：详情 */
+.info-panel { width: 360px; flex-shrink: 0; overflow-y: auto; padding: 20px; border-left: 1px solid #1e1e1e; }
+.section { margin-bottom: 24px; }
+.section-title { font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+.description { font-size: 14px; line-height: 1.7; color: #ccc; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { background: #1e1e1e; border: 1px solid #2a2a2a; border-radius: 20px; padding: 3px 10px; font-size: 12px; color: #aaa; cursor: pointer; }
+.tag:hover { border-color: #4a9eff; color: #4a9eff; }
+.meta-table { width: 100%; border-collapse: collapse; }
+.meta-table tr td { padding: 5px 0; font-size: 13px; vertical-align: top; }
+.meta-table tr td:first-child { color: #666; width: 80px; white-space: nowrap; }
+.meta-table tr td:last-child { color: #ccc; word-break: break-all; }
+.meta-link { color: #4a9eff; text-decoration: none; }
+.meta-link:hover { text-decoration: underline; }
+.score-bar { display: flex; align-items: center; gap: 8px; }
+.score-dots { display: flex; gap: 3px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #2a2a2a; }
+.dot.filled { background: #4a9eff; }
+.flag { display: inline-flex; align-items: center; gap: 5px; background: #1e2a1e; border: 1px solid #2a3a2a; border-radius: 6px; padding: 4px 10px; font-size: 12px; color: #6aaa6a; margin: 3px; }
+.flag.off { background: #1e1e1e; border-color: #2a2a2a; color: #555; }
+.related-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.related-card { aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: #1e1e1e; cursor: pointer; position: relative; }
+.related-card img { width: 100%; height: 100%; object-fit: cover; transition: transform .2s; display: block; }
+.related-card:hover img { transform: scale(1.06); }
+.related-card .rc-city { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.8)); padding: 12px 5px 4px; font-size: 10px; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .2s; }
+.related-card:hover .rc-city { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- 下载进度弹窗 -->
+<div class="dl-overlay" id="dl-overlay">
+  <div class="dl-box">
+    <h3 id="dl-fname">正在下载...</h3>
+    <div class="dl-pct" id="dl-pct">0%</div>
+    <div class="dl-track"><div class="dl-bar" id="dl-bar"></div></div>
+    <div class="dl-size" id="dl-size">正在准备...</div>
+    <button class="dl-cancel" id="dl-cancel" onclick="cancelDownload()">取消</button>
+  </div>
+</div>
+
+<div class="topbar">
+  <a class="back" href="/" onclick="history.length>1 ? (history.back(), event.preventDefault()) : null">← 返回</a>
+  <span class="fname" id="fname">加载中...</span>
+  <button class="dl-btn" onclick="downloadOriginal()">⬇ 下载原图</button>
+  <div class="btn-group">
+    <button class="jpeg-arrow" onclick="toggleJpegMenu(event)">🖼 JPEG ▾</button>
+    <div class="jpeg-dd" id="jpeg-dd">
+      <div class="jpeg-dd-item" onclick="downloadJpeg('small')">小图下载 <span>1920px · 快速</span></div>
+      <div class="jpeg-dd-item" onclick="downloadJpeg('medium')">中图下载 <span>3840px</span></div>
+      <div class="jpeg-dd-item" onclick="downloadJpeg('large')">大图下载 <span>原始分辨率</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="img-panel" id="img-panel">
+    <div class="img-placeholder">🖼️</div>
+    <div class="rotate-bar" id="rotate-bar" style="display:none">
+      <button class="rot-btn" onclick="rotate(-90)">↺</button>
+      <button class="rot-btn" onclick="rotate(90)">↻</button>
+    </div>
+  </div>
+
+  <div class="info-panel" id="info-panel">
+    <div class="section">
+      <div class="section-title">AI 描述</div>
+      <div class="description" id="description">加载中...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const mediaId = location.pathname.split('/').pop();
+let _filename = '';
+let _abortCtrl = null;
+let _downloading = false;
+let _deg = 0;
+
+// ── 页面加载 ────────────────────────────────────────────────────────────────
+
+async function load() {
+  const res = await fetch(`/api/media/${mediaId}`);
+  if (!res.ok) { document.getElementById('description').textContent = '加载失败'; return; }
+  const m = await res.json();
+
+  _filename = m.filename || `media_${mediaId}`;
+  document.title = m.filename;
+  document.getElementById('fname').textContent = m.filename;
+
+  const imgPanel = document.getElementById('img-panel');
+  _deg = 0;
+  imgPanel.innerHTML = `<img src="/api/thumbnail/${mediaId}" alt="${m.filename}"
+    onload="document.getElementById('rotate-bar').style.display='flex'"
+    onerror="this.outerHTML='<div class=img-placeholder>${m.media_type==='video'?'🎬':'🖼️'}</div>'">
+  <div class="rotate-bar" id="rotate-bar" style="display:none">
+    <button class="rot-btn" onclick="rotate(-90)">↺</button>
+    <button class="rot-btn" onclick="rotate(90)">↻</button>
+  </div>`;
+
+  const panel = document.getElementById('info-panel');
+  panel.innerHTML = '';
+
+  addSection(panel, 'AI 描述', `<div class="description">${m.description || '暂无描述'}</div>`);
+
+  const tags = [...(m.scene_tags || []), ...(m.objects || [])];
+  if (tags.length) {
+    addSection(panel, '标签 / 物体', `<div class="tags">${
+      tags.map(t => `<span class="tag" onclick="searchTag('${t}')">${t}</span>`).join('')
+    }</div>`);
+  }
+
+  const flags = [
+    { label: '封面候选', val: m.is_cover_worthy, reason: m.cover_reason },
+    { label: '配图候选', val: m.is_caption_worthy, reason: m.caption_reason },
+    { label: 'B-Roll素材', val: m.is_broll },
+    { label: '竖构图', val: m.is_vertical_comp },
+  ];
+  addSection(panel, '创作标记', `<div>${
+    flags.map(f => `<span class="flag ${f.val?'':'off'}" title="${f.reason||''}">${f.val?'✓':'✗'} ${f.label}</span>`).join('')
+  }</div>`);
+
+  if (m.quality_score != null) {
+    const score = parseInt(m.quality_score) || 0;
+    const dots = Array.from({length:5}, (_,i) => `<div class="dot ${i<score?'filled':''}"></div>`).join('');
+    addSection(panel, '质量评分', `<div class="score-bar"><div class="score-dots">${dots}</div><span style="font-size:13px;color:#aaa">${score}/5</span></div>`);
+  }
+
+  // 拍摄时间：提取日期部分并生成链接
+  function extractIsoDate(takenAt) {
+    if (!takenAt) return null;
+    const s = takenAt.slice(0, 10).replace(/:/g, '-');
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+  }
+  function formatDateCN(iso) {
+    const [y, m, d] = iso.split('-');
+    return `${y}年${parseInt(m)}月${parseInt(d)}日`;
+  }
+  const takenIso = extractIsoDate(m.taken_at);
+  const dateCell = takenIso
+    ? `<a class="meta-link" href="/?taken_date=${takenIso}">${formatDateCN(takenIso)}</a>`
+    : (m.taken_at || '');
+
+  // 地点：完整地址链接同地点照片
+  const geoText = m.geo_detail || m.geo_city;
+  const geoCell = geoText
+    ? `<a class="meta-link" href="/?q=${encodeURIComponent(geoText)}">${geoText}</a>`
+    : '';
+
+  const meta = [
+    ['拍摄时间', dateCell],
+    ['相机', [m.camera_make, m.camera_model].filter(Boolean).join(' ')],
+    ['地点', geoCell],
+    ['国家', m.geo_country],
+    ['天气', m.weather],
+    ['季节', m.season],
+    ['氛围', m.mood],
+    ['人物', m.has_person ? `有（${m.person_count||'?'}人）${m.person_desc?' — '+m.person_desc:''}` : '无'],
+  ].filter(([,v]) => v);
+
+  if (meta.length) {
+    addSection(panel, '元数据', `<table class="meta-table">${
+      meta.map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')
+    }</table>`);
+  }
+
+  addSection(panel, '文件', `<table class="meta-table">
+    <tr><td>文件名</td><td>${m.filename}</td></tr>
+    <tr><td>类型</td><td>${m.media_type==='video'?'视频':'照片'}</td></tr>
+    <tr><td>格式</td><td>${(m.file_ext||'').toUpperCase()}</td></tr>
+    <tr><td>路径</td><td style="font-size:11px">${m.pan_path||''}</td></tr>
+  </table>`);
+
+  const relSec = document.createElement('div');
+  relSec.className = 'section';
+  relSec.innerHTML = '<div class="section-title">相似图片</div><div class="related-grid" id="related-grid"><div style="color:#555;font-size:12px">加载中...</div></div>';
+  panel.appendChild(relSec);
+  loadRelated();
+}
+
+function addSection(parent, title, html) {
+  const sec = document.createElement('div');
+  sec.className = 'section';
+  sec.innerHTML = `<div class="section-title">${title}</div>${html}`;
+  parent.appendChild(sec);
+}
+
+async function loadRelated() {
+  try {
+    const res = await fetch(`/api/related/${mediaId}`);
+    const data = await res.json();
+    const grid = document.getElementById('related-grid');
+    if (!grid) return;
+    if (!data.items?.length) {
+      grid.innerHTML = '<div style="color:#555;font-size:12px">暂无相似图片</div>';
+      return;
+    }
+    grid.innerHTML = data.items.map(item => `
+      <div class="related-card" onclick="location.replace('/detail/${item.id}')">
+        <img src="/api/thumbnail/${item.id}" loading="lazy" onerror="this.style.display='none'">
+        <div class="rc-city">${item.geo_city||item.filename||''}</div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+// ── 旋转 ──────────────────────────────────────────────────────────────────
+
+function rotate(delta) {
+  _deg = (_deg + delta + 360) % 360;
+  const img = document.querySelector('#img-panel img');
+  if (img) img.style.transform = `rotate(${_deg}deg)`;
+}
+
+function searchTag(tag) {
+  location.href = `/?q=${encodeURIComponent(tag)}`;
+}
+
+// ── 下载原图 ───────────────────────────────────────────────────────────────
+
+function downloadOriginal() {
+  startDownload(`/api/download/${mediaId}`, _filename, '正在从百度网盘获取...');
+}
+
+// ── JPEG 下拉 ──────────────────────────────────────────────────────────────
+
+function toggleJpegMenu(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('jpeg-dd');
+  dd.classList.toggle('show');
+  if (dd.classList.contains('show')) {
+    document.addEventListener('click', () => dd.classList.remove('show'), { once: true });
+  }
+}
+
+function downloadJpeg(size) {
+  document.getElementById('jpeg-dd').classList.remove('show');
+  const label = { small: '小', medium: '中', large: '大' }[size];
+  const px    = { small: '1920px', medium: '3840px', large: '原始分辨率' }[size];
+  const stem  = _filename.replace(/\.[^.]+$/, '');
+  startDownload(`/api/jpeg/${mediaId}?size=${size}`, `${stem}_${label}.jpg`,
+    `正在从网盘下载并转换为 JPEG (${px})，请稍候...`);
+}
+
+// ── 通用下载函数 ────────────────────────────────────────────────────────────
+
+function fmt(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+async function startDownload(url, saveFilename, waitMsg = '正在准备...') {
+  if (_downloading) return;
+  _downloading = true;
+
+  document.getElementById('dl-fname').textContent = saveFilename;
+  document.getElementById('dl-pct').textContent = '...';
+  document.getElementById('dl-bar').style.width = '0';
+  document.getElementById('dl-size').textContent = waitMsg;
+  document.getElementById('dl-cancel').textContent = '取消';
+  document.getElementById('dl-overlay').classList.add('show');
+
+  _abortCtrl = new AbortController();
+  try {
+    const resp = await fetch(url, { signal: _abortCtrl.signal });
+    if (!resp.ok) throw new Error(`服务器错误 ${resp.status}`);
+
+    const total = parseInt(resp.headers.get('content-length') || '0');
+    const reader = resp.body.getReader();
+    const chunks = [];
+    let received = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      if (total > 0) {
+        const pct = Math.round(received / total * 100);
+        document.getElementById('dl-bar').style.width = pct + '%';
+        document.getElementById('dl-pct').textContent = pct + '%';
+        document.getElementById('dl-size').textContent = `${fmt(received)} / ${fmt(total)}`;
+      } else {
+        document.getElementById('dl-pct').textContent = fmt(received);
+        document.getElementById('dl-size').textContent = '正在下载...';
+      }
+    }
+
+    const blob = new Blob(chunks);
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl; a.download = saveFilename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(objUrl), 10000);
+
+    document.getElementById('dl-pct').textContent = '完成';
+    document.getElementById('dl-size').textContent = `已下载 ${fmt(received)}`;
+    document.getElementById('dl-cancel').textContent = '关闭';
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      document.getElementById('dl-overlay').classList.remove('show');
+    } else {
+      document.getElementById('dl-pct').textContent = '失败';
+      document.getElementById('dl-size').textContent = e.message || '下载出错';
+      document.getElementById('dl-cancel').textContent = '关闭';
+    }
+  } finally {
+    _downloading = false;
+    _abortCtrl = null;
+  }
+}
+
+function cancelDownload() {
+  if (_abortCtrl) {
+    _abortCtrl.abort();
+  } else {
+    document.getElementById('dl-overlay').classList.remove('show');
+    document.getElementById('dl-cancel').textContent = '取消';
+  }
+}
+
+// ── 右键预览菜单 ────────────────────────────────────────────────────────────
+
+document.addEventListener('contextmenu', e => {
+  const panel = document.getElementById('img-panel');
+  if (!panel?.contains(e.target) || !panel.querySelector('img')) return;
+  e.preventDefault();
+  showCtxMenu(e.clientX, e.clientY);
+});
+
+function showCtxMenu(x, y) {
+  document.getElementById('ctx-menu')?.remove();
+  const menu = document.createElement('div');
+  menu.id = 'ctx-menu';
+  menu.className = 'ctx-menu';
+  menu.innerHTML = `
+    <div class="ctx-title">切换预览质量</div>
+    <div class="ctx-item" onclick="loadPreview('small')">预览小图 <span>1920px · 快速</span></div>
+    <div class="ctx-item" onclick="loadPreview('medium')">预览中图 <span>3840px</span></div>
+    <div class="ctx-item" onclick="loadPreview('large')">预览原图 <span>原始分辨率</span></div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-title">复制到剪贴板</div>
+    <div class="ctx-item" onclick="copyToClipboard('small')">复制小图 <span>1920px · 推荐</span></div>
+    <div class="ctx-item" onclick="copyToClipboard('medium')">复制中图 <span>3840px</span></div>
+    <div class="ctx-item" onclick="copyToClipboard('large')">复制原图 <span>原始分辨率</span></div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="rotate(-90)">向左旋转 <span>↺</span></div>
+    <div class="ctx-item" onclick="rotate(90)">向右旋转 <span>↻</span></div>
+  `;
+  menu.style.left = x + 'px';
+  menu.style.top  = y + 'px';
+  document.body.appendChild(menu);
+
+  // 防止超出屏幕
+  const r = menu.getBoundingClientRect();
+  if (r.right  > window.innerWidth)  menu.style.left = (x - r.width)  + 'px';
+  if (r.bottom > window.innerHeight) menu.style.top  = (y - r.height) + 'px';
+
+  setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 0);
+}
+
+async function loadPreview(size) {
+  document.getElementById('ctx-menu')?.remove();
+  const panel = document.getElementById('img-panel');
+  const img = panel?.querySelector('img');
+  if (!img) return;
+
+  const label = { small: '小图 1920px', medium: '中图 3840px', large: '原始分辨率' }[size];
+  const overlay = document.createElement('div');
+  overlay.className = 'preview-loading';
+  overlay.innerHTML = `<p>加载${label}中...</p><small>首次加载需从百度网盘转换，请稍候</small>`;
+  panel.appendChild(overlay);
+
+  const newSrc = `/api/jpeg/${mediaId}?size=${size}`;
+  const tmp = new window.Image();
+  tmp.onload = () => {
+    _deg = 0;
+    img.style.transform = '';
+    img.src = newSrc;
+    overlay.remove();
+  };
+  tmp.onerror = () => {
+    overlay.innerHTML = `<p style="color:#f66">加载失败</p>`;
+    setTimeout(() => overlay.remove(), 2000);
+  };
+  tmp.src = newSrc;
+}
+
+// ── 复制到剪贴板 ────────────────────────────────────────────────────────────
+
+function showToast(msg, duration = 2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+async function copyToClipboard(size) {
+  document.getElementById('ctx-menu')?.remove();
+  const label = { small: '小图 1920px', medium: '中图 3840px', large: '原图' }[size];
+  showToast(`正在加载 ${label}，请稍候...`, 30000);
+
+  try {
+    // 用 fetch 获取图片（携带 Basic Auth 凭据）
+    const resp = await fetch(`/api/jpeg/${mediaId}?size=${size}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const srcBlob = await resp.blob();
+
+    // 画到 canvas 转为 PNG（Chrome 剪贴板只接受 image/png）
+    const bmp = await createImageBitmap(srcBlob);
+    const canvas = document.createElement('canvas');
+    canvas.width  = bmp.width;
+    canvas.height = bmp.height;
+    canvas.getContext('2d').drawImage(bmp, 0, 0);
+    bmp.close();
+
+    const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+
+    showToast(`✓ 已复制 ${label} 到剪贴板，可直接粘贴`);
+  } catch (e) {
+    showToast(`复制失败：${e.message || '请确认浏览器已授权剪贴板权限'}`);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>照片索引器</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; }
+
+/* 顶栏 */
+.topbar { position: sticky; top: 0; z-index: 100; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; padding: 12px 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.topbar input[type=text] { flex: 1; min-width: 200px; padding: 8px 14px; border-radius: 8px; border: 1px solid #333; background: #252525; color: #e0e0e0; font-size: 15px; outline: none; }
+.topbar input[type=text]:focus { border-color: #4a9eff; }
+.topbar button { padding: 8px 18px; border-radius: 8px; border: none; background: #4a9eff; color: #fff; font-size: 14px; cursor: pointer; }
+.topbar button:hover { background: #3a8ef0; }
+select { padding: 8px 10px; border-radius: 8px; border: 1px solid #333; background: #252525; color: #e0e0e0; font-size: 13px; cursor: pointer; }
+.stats { font-size: 12px; color: #666; white-space: nowrap; }
+
+/* 图片网格 */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; padding: 12px; }
+.card { position: relative; border-radius: 8px; overflow: hidden; background: #1e1e1e; cursor: pointer; aspect-ratio: 1; }
+.card img { width: 100%; height: 100%; object-fit: cover; transition: transform .2s; display: block; }
+.card:hover img { transform: scale(1.04); }
+.card-info { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,.85)); padding: 20px 8px 8px; opacity: 0; transition: opacity .2s; }
+.card:hover .card-info { opacity: 1; }
+.card-info .fname { font-size: 11px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-info .city { font-size: 11px; color: #aaa; }
+.card-badge { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.6); border-radius: 4px; padding: 2px 5px; font-size: 10px; color: #fff; }
+.card-badge.video { background: rgba(255,100,0,.8); }
+.card-badge.cover { background: rgba(255,200,0,.85); color: #000; }
+.card-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 32px; color: #333; }
+
+/* 加载/空状态 */
+.status-msg { text-align: center; padding: 60px 20px; color: #555; font-size: 16px; }
+.load-more { display: block; margin: 16px auto; padding: 10px 32px; border-radius: 8px; border: 1px solid #333; background: #1e1e1e; color: #aaa; font-size: 14px; cursor: pointer; }
+.load-more:hover { background: #252525; }
+.filter-bar { display: none; padding: 7px 16px; background: #141414; border-bottom: 1px solid #222; font-size: 12px; color: #888; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-chip { display: inline-flex; align-items: center; gap: 5px; background: #1e2d3e; border: 1px solid #2a4a6a; border-radius: 20px; padding: 3px 10px; color: #6aacee; }
+.filter-chip button { background: none; border: none; color: #6aacee; cursor: pointer; font-size: 13px; padding: 0 1px; line-height: 1; }
+.filter-chip button:hover { color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <input type="text" id="q" placeholder="搜索描述、标签、地点、人物…" autofocus>
+  <button onclick="doSearch()">搜索</button>
+  <select id="f-type" onchange="doSearch()">
+    <option value="">全部类型</option>
+    <option value="photo">照片</option>
+    <option value="video">视频</option>
+  </select>
+  <select id="f-season" onchange="doSearch()">
+    <option value="">全部季节</option>
+    <option value="春">春</option>
+    <option value="夏">夏</option>
+    <option value="秋">秋</option>
+    <option value="冬">冬</option>
+  </select>
+  <select id="f-person" onchange="doSearch()">
+    <option value="">全部</option>
+    <option value="1">含人物</option>
+  </select>
+  <select id="f-cover" onchange="doSearch()">
+    <option value="">全部</option>
+    <option value="1">封面候选</option>
+  </select>
+  <span class="stats" id="stats">就绪</span>
+  <span class="stats" id="index-stats" style="color:#4a9eff;margin-left:4px"></span>
+</div>
+
+<div class="filter-bar" id="filter-bar"></div>
+<div id="grid" class="grid"></div>
+<div id="bottom"></div>
+
+<script>
+let offset = 0;
+let loading = false;
+let hasMore = true;
+const LIMIT = 60;
+let _takenDate = '';   // 日期筛选（从详情页链接带入）
+
+document.getElementById('q').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+function updateFilterBar() {
+  const bar = document.getElementById('filter-bar');
+  if (_takenDate) {
+    const [y, m, d] = _takenDate.split('-');
+    const label = `${y}年${parseInt(m)}月${parseInt(d)}日 拍摄`;
+    bar.innerHTML = `筛选：<span class="filter-chip">📅 ${label}<button onclick="clearDateFilter()" title="清除">×</button></span>`;
+    bar.style.display = 'flex';
+  } else {
+    bar.innerHTML = '';
+    bar.style.display = 'none';
+  }
+}
+
+function clearDateFilter() {
+  _takenDate = '';
+  doSearch();
+}
+
+function doSearch() {
+  offset = 0;
+  hasMore = true;
+  document.getElementById('grid').innerHTML = '';
+  const p = new URLSearchParams();
+  const q = document.getElementById('q').value.trim();
+  if (q) p.set('q', q);
+  const type = document.getElementById('f-type').value;
+  if (type) p.set('type', type);
+  const season = document.getElementById('f-season').value;
+  if (season) p.set('season', season);
+  const person = document.getElementById('f-person').value;
+  if (person) p.set('person', person);
+  const cover = document.getElementById('f-cover').value;
+  if (cover) p.set('cover', cover);
+  if (_takenDate) p.set('taken_date', _takenDate);
+  history.replaceState(null, '', p.toString() ? '?' + p.toString() : location.pathname);
+  updateFilterBar();
+  loadMore();
+}
+
+async function loadMore() {
+  if (loading || !hasMore) return;
+  loading = true;
+
+  const q = document.getElementById('q').value.trim();
+  const type = document.getElementById('f-type').value;
+  const season = document.getElementById('f-season').value;
+  const person = document.getElementById('f-person').value;
+  const cover = document.getElementById('f-cover').value;
+
+  const params = new URLSearchParams({ q, limit: LIMIT, offset });
+  if (type) params.set('media_type', type);
+  if (season) params.set('season', season);
+  if (person) params.set('has_person', person);
+  if (cover) params.set('is_cover_worthy', cover);
+  if (_takenDate) params.set('taken_date', _takenDate);
+
+  try {
+    const res = await fetch('/api/search?' + params);
+    if (res.status === 401) { location.reload(); return; }
+    const data = await res.json();
+
+    if (offset === 0) {
+      document.getElementById('stats').textContent = `共 ${data.count} 条结果`;
+      if (data.count === 0) {
+        document.getElementById('grid').innerHTML = '<div class="status-msg">没有找到匹配的内容</div>';
+        loading = false; return;
+      }
+    }
+
+    renderCards(data.items);
+    offset += data.items.length;
+    hasMore = data.items.length === LIMIT;
+  } catch(e) {
+    document.getElementById('stats').textContent = '加载失败';
+  }
+  loading = false;
+}
+
+function renderCards(items) {
+  const grid = document.getElementById('grid');
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.onclick = () => location.href = `/detail/${item.id}`;
+
+    let badge = '';
+    if (item.is_cover_worthy) badge = '<span class="card-badge cover">封面</span>';
+    else if (item.media_type === 'video') badge = '<span class="card-badge video">视频</span>';
+
+    const city = item.geo_city || '';
+    const fname = item.filename || '';
+
+    card.innerHTML = `
+      <img src="/api/thumbnail/${item.id}" loading="lazy"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="card-placeholder" style="display:none">${item.media_type === 'video' ? '🎬' : '🖼️'}</div>
+      ${badge}
+      <div class="card-info">
+        <div class="fname">${fname}</div>
+        ${city ? `<div class="city">📍 ${city}</div>` : ''}
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+// 滚动到底部自动加载
+const observer = new IntersectionObserver(entries => {
+  if (entries[0].isIntersecting) loadMore();
+}, { rootMargin: '200px' });
+observer.observe(document.getElementById('bottom'));
+
+// 初始加载统计
+fetch('/api/stats').then(r => r.json()).then(d => {
+  const photo = d.done_photo || 0;
+  const video = d.done_video || 0;
+  const total = d.total || 0;
+  document.getElementById('index-stats').textContent =
+    `已建索引：照片 ${photo.toLocaleString()} 张 · 视频 ${video.toLocaleString()} 个 / 共 ${total.toLocaleString()} 个文件`;
+});
+
+// 从 URL 恢复搜索条件（返回时保持搜索状态）
+(function restoreFromUrl() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('q')) document.getElementById('q').value = p.get('q');
+  if (p.get('type')) document.getElementById('f-type').value = p.get('type');
+  if (p.get('season')) document.getElementById('f-season').value = p.get('season');
+  if (p.get('person')) document.getElementById('f-person').value = p.get('person');
+  if (p.get('cover')) document.getElementById('f-cover').value = p.get('cover');
+  if (p.get('taken_date')) _takenDate = p.get('taken_date');
+})();
+
+doSearch();
+</script>
+</body>
+</html>

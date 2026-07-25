@@ -1,0 +1,25 @@
+# 核心
+requests>=2.31.0
+openai>=1.12.0
+numpy>=1.24.0
+
+# 图片处理
+Pillow>=10.0.0
+pillow-heif>=0.15.0
+exifread>=3.0.0
+piexif>=1.1.3
+
+# 视频抽帧（服务器请改用 opencv-python-headless）
+opencv-python>=4.8.0
+scenedetect[opencv]>=0.6.3
+
+# Web 服务
+fastapi>=0.110.0
+uvicorn>=0.27.0
+httpx>=0.27.0
+
+# 桌面 GUI（仅本地需要，服务器可不装）
+PyQt6>=6.6.0
+
+# 打包（可选）
+pyinstaller>=6.3.0
