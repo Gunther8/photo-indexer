@@ -1,11 +1,12 @@
 """
-无界面命令行索引器，用于在服务器上运行。
+命令行索引器。
 用法:
-  python indexer_cli.py scan          # 扫描网盘，写入 pending 记录
+  python indexer_cli.py auth          # 百度网盘 OAuth 授权
+  python indexer_cli.py scan          # 扫描网盘，写入 pending 记录，清理已删除文件
   python indexer_cli.py process       # 下载+分析，循环处理所有 pending
   python indexer_cli.py check         # 检查批处理任务结果
   python indexer_cli.py status        # 显示当前进度统计
-  python indexer_cli.py reset_errors  # 重置 error 为 pending
+  python indexer_cli.py reset_errors  # 重置 error/processing 为 pending
 """
 import sys
 import logging
@@ -91,7 +92,37 @@ def cmd_reset_errors():
     print(f"已重置 {cur.rowcount} 条记录为 pending")
 
 
+def cmd_auth():
+    """百度网盘 OAuth 授权（oob 模式，无需回调服务器）"""
+    from core.baidu_pan import BaiduPan
+    from config import get_config
+
+    cfg = get_config()
+    if not cfg.get("baidu_app_key") or not cfg.get("baidu_app_secret"):
+        print("错误：请先在 ~/.photo_indexer/config.json 填写 baidu_app_key 和 baidu_app_secret")
+        sys.exit(1)
+
+    pan = BaiduPan()
+    print("\n1. 在浏览器打开下面的链接并登录授权：\n")
+    print(f"   {pan.get_auth_url()}\n")
+    print("2. 授权后页面会显示一串授权码，复制粘贴到这里：\n")
+
+    code = input("授权码: ").strip()
+    if not code:
+        print("未输入授权码，已取消")
+        sys.exit(1)
+
+    try:
+        pan.exchange_code(code)
+    except Exception as e:
+        print(f"授权失败: {e}")
+        sys.exit(1)
+
+    print("授权成功，token 已保存到 ~/.photo_indexer/config.json")
+
+
 COMMANDS = {
+    "auth": cmd_auth,
     "scan": cmd_scan,
     "process": cmd_process,
     "check": cmd_check,
